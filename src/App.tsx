@@ -1,124 +1,163 @@
-import { ApiPromise, WsProvider } from "@polkadot/api";
+import { createClient } from "@polkadot-api/client"
 import {
-  web3Accounts,
-  web3Enable,
-  web3FromSource,
-} from "@polkadot/extension-dapp";
-import { useEffect, useState } from "react";
+  Account,
+  getInjectedExtensions,
+  getLegacyProvider,
+} from "@polkadot-api/legacy-polkadot-provider"
+import { createScClient } from "@substrate/connect"
+import React, { useEffect, useState } from "react"
+import assetHubTypes, {
+  MultiAddress,
+  XcmV3Junctions,
+  XcmV3Junction,
+} from "./codegen/assetHub"
+import assetHubChainspec from "./asset-hub"
 
-const extensions = await web3Enable("my cool dapp");
-const allAccounts = await web3Accounts({ extensions: extensions[0].name });
-const wsProvider = new WsProvider("wss://westend-asset-hub-rpc.polkadot.io");
-const api = await ApiPromise.create({ provider: wsProvider });
-const ASSET_ID = 8;
-const asset = {
-  parents: 0,
-  interior: {
-    X2: [{ PalletInstance: 50 }, { GeneralIndex: ASSET_ID }],
-  },
-};
+const ASSET_ID = 8
 
-function App() {
-  const [account, setAccount] = useState(allAccounts[0]);
-  const [balance, setBalance] = useState("null");
-  const [recipientAddress, setRecipientAddress] = useState(
-    "5GnTRaKSNiBbRygtPb7UmFRaHhEmLW9PM3LBLSLt7Eb2qzSb"
-  );
-  const [amount, setAmount] = useState("");
+const scProvider = createScClient()
+const { relayChains, connectAccounts } = getLegacyProvider(scProvider)
 
-  const handleAccountChange = (event) => {
-    const selectedAccount = allAccounts.find(
-      (elm) => elm.address === event.target.value
-    );
-    setAccount(selectedAccount);
-  };
+const assetHub = await relayChains.westend2.getParachain(assetHubChainspec)
+const client = createClient(assetHub.connect, { assets: assetHubTypes })
 
-  const handleRecipientChange = (event) => {
-    setRecipientAddress(event.target.value);
-  };
-
-  const handleAmountChange = (event) => {
-    setAmount(event.target.value);
-  };
-
-  const handleTransact = async () => {
-    const transferExtrinsic = api.tx.assets.transferKeepAlive(
-      ASSET_ID,
-      recipientAddress,
-      BigInt(amount)
-    );
-
-    const injector = await web3FromSource(account.meta.source);
-    transferExtrinsic
-      .signAndSend(
-        account.address,
-        {
-          signer: injector.signer,
-          assetId: asset,
-        },
-        ({ status }) => {
-          if (status.isInBlock) {
-            console.log(
-              `Completed at block hash #${status.asInBlock.toString()}`
-            );
-          } else {
-            console.log(`Current status: ${status.type}`);
-          }
-        }
-      )
-      .catch((error: any) => {
-        console.log(":( transaction failed", error);
-      });
-  };
+const ExtensionSelector: React.FC = () => {
+  const [availableExtensions, setAvailableExtensions] = useState<string[]>([])
+  const [selectedExtension, setSelectedExtension] = useState<string | null>(
+    null,
+  )
+  const [accounts, setAccounts] = useState<Array<Account>>([])
 
   useEffect(() => {
-    api.query.assets
-      .account(ASSET_ID, account.address)
-      .then(({ value }) => setBalance(value.balance.words[0]));
-  }, [account]);
+    getInjectedExtensions().then((newExtensions) => {
+      setAvailableExtensions(newExtensions)
+      setSelectedExtension(newExtensions[0] ?? null)
+    })
+  }, [])
+
+  useEffect(() => {
+    connectAccounts(selectedExtension)
+  }, [selectedExtension])
+
+  useEffect(() => assetHub.onAccountsChange(setAccounts), [])
+
+  if (!availableExtensions.length)
+    return <div>No Account Providers detected</div>
 
   return (
     <div>
       <div>
-        <label>From: </label>
-        {allAccounts && (
-          <select value={account.address} onChange={handleAccountChange}>
-            {allAccounts.map((elm, index) => (
-              <option key={index} value={elm.address}>
-                {elm.address}
-              </option>
-            ))}
-          </select>
-        )}
+        <label>Select Account Provider: </label>
+        <select
+          value={selectedExtension ?? ""}
+          onChange={(e) => {
+            setSelectedExtension(e.target.value)
+          }}
+        >
+          {availableExtensions.map((wallet) => (
+            <option key={wallet} value={wallet}>
+              {wallet}
+            </option>
+          ))}
+        </select>
+      </div>
+      {accounts.length ? (
+        <App accounts={accounts} />
+      ) : (
+        <div>No connected accounts :(</div>
+      )}
+    </div>
+  )
+}
+
+const App: React.FC<{ accounts: Account[] }> = ({ accounts }) => {
+  const [account, setAccount] = useState(accounts[0])
+  const [balance, setBalance] = useState<bigint | null>(null)
+  const [recipientAddress, setRecipientAddress] = useState(
+    "5ELXt7N4gPpN4d1E5c4wKyYhZFCaSDiH5zUxuWsgY4SNrPW5",
+  )
+  const [amount, setAmount] = useState("")
+  useEffect(() => {
+    setBalance(null)
+    const subscription = client.assets.query.Assets.Account.watchValue(
+      ASSET_ID,
+      account.address,
+    ).subscribe((assetAccount) => {
+      setBalance(assetAccount?.balance ?? 0n)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [account])
+
+  const handleTransact = () => {
+    client.assets.tx.Assets.transfer_keep_alive({
+      id: ASSET_ID,
+      amount: BigInt(amount),
+      target: MultiAddress.Id(recipientAddress),
+    })
+      .submit$(account.address, {
+        asset: {
+          parents: 0,
+          interior: XcmV3Junctions.X2([
+            XcmV3Junction.PalletInstance(50),
+            XcmV3Junction.GeneralIndex(BigInt(ASSET_ID)),
+          ]),
+        },
+      })
+      .subscribe({ next: console.log, error: console.error })
+  }
+
+  return (
+    <>
+      <div>
+        <label>
+          JOE's Balance: {balance === null ? "Loading..." : balance.toString()}
+        </label>
       </div>
 
       <div>
-        <label>Balance: {balance}</label>
+        <label>From: </label>
+        <select
+          value={account.address}
+          onChange={(e) => {
+            setAccount(accounts.find((a) => a.address === e.target.value)!)
+          }}
+        >
+          {accounts.map((elm) => (
+            <option key={elm.address} value={elm.address}>
+              {elm.address}
+            </option>
+          ))}
+        </select>
       </div>
-
       <div>
         <label>To: </label>
         <input
           type="text"
           value={recipientAddress}
-          onChange={handleRecipientChange}
+          onChange={(e) => {
+            setRecipientAddress(e.target.value)
+          }}
           placeholder="To address"
         />
       </div>
-
       <div>
-        <label>To: </label>
+        <label>Amount: </label>
         <input
           type="number"
           value={amount}
-          onChange={handleAmountChange}
+          onChange={(e) => {
+            setAmount(e.target.value)
+          }}
           placeholder="Enter amount to send"
         />
       </div>
 
       <button onClick={handleTransact}>Transact</button>
-    </div>
-  );
+    </>
+  )
 }
 
-export default App;
+export default ExtensionSelector
