@@ -72,19 +72,29 @@ const ExtensionSelector: React.FC = () => {
 
 const App: React.FC<{ accounts: Account[] }> = ({ accounts }) => {
   const [account, setAccount] = useState(accounts[0])
-  const [balance, setBalance] = useState<bigint | null>(null)
+  const [joeBalance, setJoeBalance] = useState<bigint | null>(null)
+  const [wndFreeBalance, setWndFreeBalance] = useState<bigint | null>(null)
   const [recipientAddress, setRecipientAddress] = useState(
     "5ELXt7N4gPpN4d1E5c4wKyYhZFCaSDiH5zUxuWsgY4SNrPW5",
   )
   const [amount, setAmount] = useState("")
   useEffect(() => {
-    setBalance(null)
+    setJoeBalance(null)
     const subscription = client.assets.query.Assets.Account.watchValue(
       ASSET_ID,
       account.address,
     ).subscribe((assetAccount) => {
-      setBalance(assetAccount?.balance ?? 0n)
+      setJoeBalance(assetAccount?.balance ?? 0n)
     })
+
+    setWndFreeBalance(null)
+    subscription.add(
+      client.assets.query.System.Account.watchValue(account.address).subscribe(
+        (account) => {
+          setWndFreeBalance(account.data.free ?? 0n)
+        },
+      ),
+    )
 
     return () => {
       subscription.unsubscribe()
@@ -113,7 +123,14 @@ const App: React.FC<{ accounts: Account[] }> = ({ accounts }) => {
     <>
       <div>
         <label>
-          JOE's Balance: {balance === null ? "Loading..." : balance.toString()}
+          WND Free Balance:{" "}
+          {wndFreeBalance === null ? "Loading..." : wndFreeBalance.toString()}
+        </label>
+      </div>
+      <div>
+        <label>
+          JOE Balance:{" "}
+          {joeBalance === null ? "Loading..." : joeBalance.toString()}
         </label>
       </div>
 
