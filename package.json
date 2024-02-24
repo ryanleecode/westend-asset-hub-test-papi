@@ -4,16 +4,21 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "papi",
+    "codegen": "papi",
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@polkadot/api": "^10.11.2",
-    "@polkadot/extension-dapp": "^0.46.6",
+    "@polkadot-api/cli": "0.0.1-8207d417c57431583f97269921a425bc169b85c3.1.0",
+    "@polkadot-api/client": "0.0.1-8207d417c57431583f97269921a425bc169b85c3.1.0",
+    "@polkadot-api/legacy-polkadot-provider": "0.0.1-8207d417c57431583f97269921a425bc169b85c3.1.0",
+    "@substrate/connect": "^0.8.7",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "rxjs": "^7.8.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
@@ -24,7 +29,19 @@
     "eslint": "^8.56.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "prettier": "3.2.5",
     "typescript": "^5.2.2",
     "vite": "^5.1.0"
+  },
+  "polkadot-api": {
+    "assetHub": {
+      "metadata": "asset-hub-metadata.scale",
+      "outputFolder": "./src/codegen/"
+    }
+  },
+  "prettier": {
+    "printWidth": 80,
+    "semi": false,
+    "trailingComma": "all"
   }
 }
