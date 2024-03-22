@@ -9,17 +9,17 @@ import React, { useEffect, useState } from "react"
 import assetHubTypes, {
   MultiAddress,
   XcmV3Junctions,
-  XcmV3Junction,
+  XcmV4Junction as XcmV3Junction,
 } from "./codegen/assetHub"
 import assetHubChainspec from "./asset-hub"
 
-const ASSET_ID = 8
+const ASSET_ID = 41
 
 const scProvider = createScClient()
 const { relayChains, connectAccounts } = getLegacyProvider(scProvider)
 
-const assetHub = await relayChains.westend2.getParachain(assetHubChainspec)
-const client = createClient(assetHub.connect, { assets: assetHubTypes })
+const assetHub = relayChains.westend2.getParachain(assetHubChainspec)
+const client = createClient(assetHub.provider).getTypedApi(assetHubTypes)
 
 const ExtensionSelector: React.FC = () => {
   const [availableExtensions, setAvailableExtensions] = useState<string[]>([])
@@ -75,12 +75,12 @@ const App: React.FC<{ accounts: Account[] }> = ({ accounts }) => {
   const [joeBalance, setJoeBalance] = useState<bigint | null>(null)
   const [wndFreeBalance, setWndFreeBalance] = useState<bigint | null>(null)
   const [recipientAddress, setRecipientAddress] = useState(
-    "5ELXt7N4gPpN4d1E5c4wKyYhZFCaSDiH5zUxuWsgY4SNrPW5",
+    "5GiuXSBkukA3tRz2VjTxiexLNsNuuxNkaPcd2u6qWCJoFiep",
   )
   const [amount, setAmount] = useState("")
   useEffect(() => {
     setJoeBalance(null)
-    const subscription = client.assets.query.Assets.Account.watchValue(
+    const subscription = client.query.Assets.Account.watchValue(
       ASSET_ID,
       account.address,
     ).subscribe((assetAccount) => {
@@ -89,7 +89,7 @@ const App: React.FC<{ accounts: Account[] }> = ({ accounts }) => {
 
     setWndFreeBalance(null)
     subscription.add(
-      client.assets.query.System.Account.watchValue(account.address).subscribe(
+      client.query.System.Account.watchValue(account.address).subscribe(
         (account) => {
           setWndFreeBalance(account.data.free ?? 0n)
         },
@@ -102,10 +102,13 @@ const App: React.FC<{ accounts: Account[] }> = ({ accounts }) => {
   }, [account])
 
   const handleTransact = () => {
-    client.assets.tx.Assets.transfer_keep_alive({
+    console.log("amount", amount)
+    console.log("recipientAddress", recipientAddress)
+
+    client.tx.Assets.transfer_keep_alive({
       id: ASSET_ID,
-      amount: BigInt(amount),
       target: MultiAddress.Id(recipientAddress),
+      amount: BigInt(amount),
     })
       .submit$(account.address, {
         asset: {

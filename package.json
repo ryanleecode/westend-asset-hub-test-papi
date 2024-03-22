@@ -12,9 +12,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@polkadot-api/cli": "0.0.1-8207d417c57431583f97269921a425bc169b85c3.1.0",
-    "@polkadot-api/client": "0.0.1-8207d417c57431583f97269921a425bc169b85c3.1.0",
-    "@polkadot-api/legacy-polkadot-provider": "0.0.1-8207d417c57431583f97269921a425bc169b85c3.1.0",
+    "@polkadot-api/cli": "next",
+    "@polkadot-api/client": "next",
+    "@polkadot-api/legacy-polkadot-provider": "next",
+    "@polkadot-api/sc-provider": "next",
     "@substrate/connect": "^0.8.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
